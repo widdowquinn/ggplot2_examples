@@ -1,0 +1,45 @@
+---
+title: '`ggplot2` Grammar'
+output: pdf_document
+toc: yes
+---
+
+# Introduction
+
+This document presents the examples from Chapter 3 of Hadley Wickham's book **ggplot2**, "Mastering the grammar".
+
+The layered grammar of `ggplot2` is based on Wilkinson's "Grammar of Graphics." The grammar is useful because it allows the user to iteratively update plots one feature at a time. The modular design also enables developers to add a single component (such as a statistical transformation) at a time, and use the existing grammar components i conjunction with it.
+
+# Dataset
+
+We will be using the `mpg` dataset provided by `ggplot2`
+
+```{r imports}
+library(ggplot2)
+head(mpg)
+```
+
+# Using `qplot()`
+
+We can use `qplot()` to simply render a scatterplot of two continuous variables (engine displacement and mpg), colouring points by number of cylinders:
+
+```{r qplot, fig.width=5, fig.height=3}
+qplot(displ, hwy, data=mpg, colour=factor(cyl))
+```
+
+# A more complex plot
+
+This plot adds facets, multiple layers and statistics to the basic concepts of the grammar:
+
+```{r complex, fig.width=5, fig.height=3, message=F, warning=F}
+qplot(displ, hwy, data=mpg, facets=. ~ year) + geom_smooth()
+```
+
+# Data structures
+
+The following code illustrates the `ggplot2` data structure
+
+```{r datastructure}
+p = qplot(displ, hwy, data=mpg, colour=factor(cyl))
+summary(p)
+```

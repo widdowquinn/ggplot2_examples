@@ -1,0 +1,274 @@
+---
+title: "Basic Usage of `qplot()`"
+output: pdf_document
+toc: yes
+---
+
+# Introduction
+
+This is a summary of examples in Chapter 2 of Hadley Wickham's book **ggplot2**: "Getting started with qplot".
+
+The `qplot()` function is intended to be similar to `R`'s `plot()` function, and is illustrated using the `diamonds` dataset provided with `ggplot2`.
+
+# Dataset
+
+To obtain the `diamonds` dataset, we import the `ggplot2` library, and choose a random subset of the data. We set the seed value for randomisation to match the book examples.
+
+```{r import_data}
+library(ggplot2)
+set.seed(1410)
+dsmall = diamonds[sample(nrow(diamonds), 100),]
+head(dsmall)
+```
+
+# Basic use
+
+The first two arguments to `qplot()` are the `x` and `y` values. There is also an optional `data` argument, to set variable namespace.
+
+Using the basic `qplot()` function produces a scatterplot, indicating a correlation between diamond price and carats.
+
+```{r basic_plot, fig.height=3, fig.width=4}
+qplot(carat, price, data=diamonds)
+```
+
+Given the way the plot curves and fans out, it looks like it might be worth transforming this data, and we can do this on the fly by providing `log(carat)` and `log(price)` as the `x` and `y` arguments:
+
+```{r basic_plot_transform, fig.height=3, fig.width=4}
+qplot(log(carat), log(price), data=diamonds)
+```
+
+This looks a little more like a linear relationship, but there is a lot of data and overplotting, so caution should be exercised in interpretation.
+
+`qplot()` will also accept arguments that are functions of existing data. We can define the enclosing volume of the diamond (a cuboid of height, width and depth) as `x * y * z`, and provide this as the `y` argument of `qplot()`:
+
+```{r basic_plot_volume, fig.height=3, fig.width=4}
+qplot(carat, x * y * z, data=diamonds)
+```
+
+There's a sensibly linear relationship between mass (carats) and enclosing volume, but there are some outliers visible.
+
+# Colour, size, shape, and aesthetic attributes
+
+Unlike `R`'s `plot()` function, `qplot()` can assign colours, shapes and other aesthetic attributes to categorical variables directly.
+
+```{r basic_plot_aesthetics, fig.height=3, fig.width=4}
+qplot(carat, price, data=dsmall, colour=color)
+qplot(carat, price, data=dsmall, shape=cut)
+```
+
+Aesthetic attributes like colour and shape are visual properties that affect the way observations are displayed. For each attribute there is a function, called a *scale* that maps data points to valid values of the aesthetic. That scale controls the appearance of the points.
+
+Aesthetics can be set manually, using the function `I()`. This can be demonstrated using the `alpha` aesthetic, which controls the *alpha* (transparency) level of plotted points. By using the `I()` function, we can modify the number of overplotted points that are required to give an opaque appearance:
+
+```{r basic_plot_opacity, fig.height=3, fig.width=4}
+qplot(carat, price, data=diamonds, alpha=I(1/20))
+qplot(carat, price, data=diamonds, alpha=I(1/100))
+qplot(carat, price, data=diamonds, alpha=I(1/200))
+```
+
+Different aesthetics work better for some type of data than others; colour and shape are very useful for categorical data, less good for continuous data. If there is a large amount of data, it may be better to use faceting.
+
+# Plot `geom`s
+
+`geom`, short for "geometric object", describes the type of object used to display data. Some `geom`s are compounds involving a statistical transformation: a histogram is a binning statistic, followed by application of a bar `geom`. There are several `geom`s available. For two-dimensional relationships:
+
+- `geom="point"` (default) gives a scatterplot
+- `geom="smooth"` fits a smoother to data, displaying the smooth and its standard error
+- `geom="boxplot"` gives a box-and-whisker plot
+- `geom="path"` and `geom="line"` draw lines between datapoints; `line` is constrained to go left-to-right, while `path` allows any direction
+
+For one-dimensional relationships:
+
+- `geom="histogram"` (default) draws a histogram
+- `geom="freqpoly"` draws a frequency polygon
+- `geom="density"` gives a density plot
+- `geom="bar"` (discrete variables) gives a bar chart
+
+`geoms` may be combined (overlaid) in a vector:
+
+- `geom=c("point", "smooth")` 
+
+they are overlaid in the order provided.
+
+## Adding a smoother to a plot
+
+To visualise trends more easily where there are many datapoints, it can be useful to add a smoothing line, which can be done with the `smooth` `geom`:
+
+```{r basic_plot_smooth, fig.height=3, fig.width=4, message=F, warning=F}
+qplot(carat, price, data=dsmall, geom=c("point", "smooth"))
+qplot(carat, price, data=diamonds, geom=c("point", "smooth"))
+```
+
+The exponential relationship that was suspected seems to be supported by the smoothing, though the small number of large (>3 carat) diamonds disproportionately affect the relationship, which is reflected in the uncertainty indicated by the plotted confidence interval.
+
+The confidence interval can be turned off with the argument `se=FALSE`
+
+```{r basic_plot_smooth_noci, fig.height=3, fig.width=4, message=F, warning=F}
+qplot(carat, price, data=dsmall, geom=c("point", "smooth"), se=FALSE)
+```
+
+There are several smoothing routines available:
+
+- `method="loess"` (default for small *n*), uses smooth local regression. The windowing of regression is controlled by the `span` parameter, for which values close to 0 are 'wiggly', and those close to 1 less so. For more than around 1,000 datapoints, this method is slow, and a different default is used.
+
+```{r basic_plot_smooth_loess, fig.height=3, fig.width=4, message=F, warning=F}
+qplot(carat, price, data=dsmall, geom=c("point", "smooth"), span=0.2)
+qplot(carat, price, data=dsmall, geom=c("point", "smooth"), span=1)
+```
+
+- `method="gam"` This is part of the `mgcv` library and uses `formula = y ~ s(x)` to fit a generalised additive model to the data. This is similar to a spline, but the degree of smoothness is estimated from the data. For large datasets (*n* > 1000), the formula `y ~ s(x, bs="cs")` should be used.
+
+```{r basic_plot_smooth_gam, fig.height=3, fig.width=4, message=F, warning=F}
+qplot(carat, price, data=dsmall, geom=c("point", "smooth"), 
+      method="gam", formula=y~s(x))
+qplot(carat, price, data=dsmall, geom=c("point", "smooth"), 
+      method="gam", formula=y~s(x, bs="cs"))
+```
+
+- `method="lm"` fits a linear model to the data. The default fits a straight line, but the `poly()` function can be used to specify any degree polynomial, and the `ns()` function from the `splines` package to specify a natural spline with an appropriate degree of freedom:
+
+```{r basic_plot_smooth_lm, fig.height=3, fig.width=4, message=F, warning=F}
+library(splines)
+qplot(carat, price, data=dsmall, geom=c("point", "smooth"), 
+      method="lm")
+qplot(carat, price, data=dsmall, geom=c("point", "smooth"), 
+      method="lm", formula=y~poly(x, 2))
+qplot(carat, price, data=dsmall, geom=c("point", "smooth"), 
+      method="lm", formula=y~ns(x, 5))
+```
+
+- `method="rlm"` fits a robust linear model, which is less susceptible to influence from outliers. This requires the `MASS` package.
+
+```{r basic_plot_smooth_rlm, fig.height=3, fig.width=4, message=F, warning=F}
+library(MASS)
+qplot(carat, price, data=dsmall, geom=c("point", "smooth"), 
+      method="rlm")
+qplot(carat, price, data=dsmall, geom=c("point", "smooth"), 
+      method="rlm", formula=y~poly(x, 2))
+qplot(carat, price, data=dsmall, geom=c("point", "smooth"), 
+      method="rlm", formula=y~ns(x, 5))
+```
+
+## Boxplots and jittered points
+
+For a dataset that includes a categorical variable and one or more continuous variables, it can be interesting to visualise how values of continuous variables vary with levels of the categorical variable. Two `geom`s that are useful here are `geom="jitter"` and `geom="boxplot"`, and we use these to see how the price per carat varies with diamond colour. 
+
+Firstly, using `geom="jitter"` and varying the `alpha` argument to reduce overplotting:
+
+```{r basic_plot_jitter, fig.height=3, fig.width=4}
+qplot(color, price/carat, data=diamonds, geom="jitter", alpha=I(1/5))
+qplot(color, price/carat, data=diamonds, geom="jitter", alpha=I(1/50))
+qplot(color, price/carat, data=diamonds, geom="jitter", alpha=I(1/200))
+```
+
+Then using `geom="boxplot"`:
+
+```{r basic_plot_boxplot, fig.height=3, fig.width=4}
+qplot(color, price/carat, data=diamonds, geom="boxplot")
+```
+
+Boxplots can summarise a complete distribution in only five numbers, while jitter plots represent every point, but suffer from overplotting. In this example, both methods show a dependence of the spread of price per carat on colour, but the boxplot is more informative in showing that the median and quartiles do not very much with colour.
+
+Jitter plot aesthetics, `colour`, `shape`, `size`, etc. can be controlled just as for scatterplots.
+
+Box plot aesthetics that can be modified are `colour` (outline), `fill`, and `size` of lines.
+
+## Histogram and density plots
+
+Histogram and density plots show the distribution of a single variable (one-dimensional data). They provide more information about any single group than do boxplots, but are more difficult to compare visually.
+
+```{r basic_plot_histdens, fig.height=3, fig.width=4, message=F, warning=F}
+qplot(carat, data=diamonds, geom="histogram")
+qplot(carat, data=diamonds, geom="density")
+```
+
+The `density` plot takes an `adjust` argument that controls the degree of smoothing, where higher values give smoother plots.
+
+For the `histogram`, the `binwidth` argument controls smoothing by setting bin size, and breaks can be controlled explicitly with the `breaks` argument.
+
+In both cases, it is **very important** to experiment with the level of smoothing, as different aspects of the data may be illustrated at particular settings:
+
+```{r basic_plot_histogram, fig.height=3, fig.width=4, message=F, warning=F}
+qplot(carat, data=diamonds, geom="histogram", binwidth=1, xlim=c(0, 3))
+qplot(carat, data=diamonds, geom="histogram", binwidth=0.1, xlim=c(0, 3))
+qplot(carat, data=diamonds, geom="histogram", binwidth=0.01, xlim=c(0, 3))
+```
+
+The distributions of different subgroups can be compared using an aesthetic mapping to the appropriate categorical variable:
+
+```{r basic_plot_histdensaes, fig.height=3, fig.width=4, message=F, warning=F}
+qplot(carat, data=diamonds, geom="histogram", fill=color)
+qplot(carat, data=diamonds, geom="density", colour=color)
+```
+
+Density plots are pretty, and appealing, but they make assumptions about the data that might not be true: that the data is unbounded, continuous, and smooth.
+
+## Bar charts
+
+Bar charts are a discrete analogue of histograms. Using `bar="geom"` automatically counts instances of each class, so they do not need to be pre-tabulated (unike `R`s `barchart()` function). However, if the data is already tabulated, or there is a need to tabulate class members in another way, such as by summing a continuous variable, this can be provided by the `weight` argument.
+
+```{r basic_plot_bar, fig.height=3, fig.width=4}
+qplot(color, data=diamonds, geom="bar")
+qplot(color, data=diamonds, geom="bar", weight=carat) + scale_y_continuous("carat")
+```
+
+## Time series with line and path plots
+
+Line and path plots are typically used for time series data. Line plots join points from left to right, while path plots join them in the order they appear in the dataset. Line plots usually have time on the *x* axis, while path plots show how two variables simultaneously vary over time, with time implicitly encoded in the way points are joined.
+
+There is no time data in the `diamonds` dataset, so we use the `economics` dataset instead. This covers 40 years of US economic data, and we plot unemployment as a relative measure against the population at large, and then as an absolute value of median weeks unemployed, using `geom="line"`:
+
+```{r basic_plot_line, fig.height=3, fig.width=4}
+qplot(date, unemploy/pop, data=economics, geom="line")
+qplot(date, uempmed, data=economics, geom="line")
+```
+
+We can show both series on the same plot with a scatterplot, but we would lose the implicit time relationship. Instead, using `geom="path"` we can join adjacent points in time to see the evolution of the data:
+
+```{r basic_plot_path, fig.height=3, fig.width=4}
+qplot(unemploy/pop, uempmed, data=economics, geom=c("point", "path"))
+```
+
+There is clearly correlation between length of unemployment and unemployment rate, but there are many line crossings, which makes the evolution of the data difficult to see, so we can use a function to colour lines and points by time:
+
+```{r basic_plot_pathcol, fig.height=3, fig.width=4, message=F, warning=F}
+year = function(x) as.POSIXlt(x)$year + 1900
+qplot(unemploy/pop, uempmed, data=economics, geom=c("point", "path"),
+      colour=year(date)) + scale_size_area()
+```
+
+With the addition of colour we can see that, in addition to the correlation noted above, the length of unemployment has been increasing relative to unemployment rate, in recent years.
+
+# Faceting
+
+Faceting creates tables of graphics by splitting data into subsets and displaying the same graph for each subset. This is useful for making comparisons between data subsets. The default method in `qplot()` displays plots according to the faceting formula `row.var ~ col.var`. It is possible to use several variables for either rows or columns, but this can affect interpretability and the ability to display data. To facet only on rows or columns, the `.` placeholder can be used, for example `row.var ~ .` will create a single column with multiple rows (specified by `row.var`).
+
+```{r basic_plot_facet, fig.height=7, fig.width=7}
+qplot(carat, data=diamonds, facets=color ~ ., geom="histogram",
+      binwidth=0.1, xlim=c(0, 3))
+qplot(carat, ..density.., data=diamonds, facets=color ~ ., geom="histogram",
+      binwidth=0.1, xlim=c(0, 3))
+```
+
+The `..density..` syntax tells `ggplot2` to map the density for each bin (a statistical transformation) to the *y*-axis, rather than the count of observations, which would be the default. This allows us to plot proportions for each facet, rather than counts, which makes comparison across facets easier.
+
+# Other options
+
+The output of `qplot()` can be controlled with other options, which are equivalent to those in `plot()`:
+
+- `xlim`, `ylim`: set limits for *x*- and *y*-axes., e.g. `xlim=c(0,20)`
+- `log`: indicate which (if any) axes should be logged, e.g. `log="xy"`
+- `main`: main title for the plot
+- `xlab`, `ylab`: labels for *x*- and *y*-axes
+
+```{r basic_plot_options, fig.height=3, fig.width=4, message=F, warning=F}
+qplot(carat, price, data=dsmall,
+      xlab="Price ($)", ylab="Weight (carat)",
+      main="Price-weight relationship")
+qplot(carat, price/carat, data=dsmall,
+      xlab="Weight (carat)",
+      ylab=expression(frac(price, carat)),
+      main="Small diamonds",
+      xlim=c(.2,1))
+qplot(carat, price, data=dsmall, log="xy")
+```

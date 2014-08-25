@@ -1,0 +1,85 @@
+---
+title: "Toolbox"
+output: pdf_document
+toc: yes
+---
+
+# Introduction
+
+This document presents the examples from Chapter 5 of Hadley Wickham's book **ggplot2**, "Toolbox".
+
+This chapter presents a large number of examples for the display of a range of plot types, spanning many common circumstances of data presentation.
+
+## Layering strategies
+
+Wickham describes three purposes for a layer:
+
+- **representing raw data**: we use pattern detection skills to identify gross and local structures, and outliers.
+- **statistical summary of data**: it is useful to display models of data, and display predictions in the context of the data; this helps evaulate the model against the data.
+- **addition of metadata**: the display of background context and annotations can help give meaning to raw data.
+
+# Basic plot types
+
+A handful of `geom`s constitute the basic building blocks of `ggplot2`. Most are associated with a named plot (i.e. when used on their own, the plot has a special name). Each of these `geom`s is two-dimensional, requiring `x` and `y` aesthetics, understanding `size` and `colour` aesthetics. Filled `geom`' understand `fill`, while the point `geom` uses shape, and the line and path `geom`s understand `linetype`.
+
+- `geom_area()`: draws an **area plot**, a line plot filled to the *y*-axis
+- `geom_bar(stat="identity")`: makes a **barchart**; `stat="identity"` is required as the default `stat` counts values.
+- `geom_line()`: makes a **line plot**, where points are connected from left to right
+- `geom_path()`: makes a **line plot**, where points are connected in the order they occur in the data
+- `geom_point()`: renders a  **scatterplot**
+- `geom_polygon()`: draws polygons, which are filled paths; each polygon vertex requires a separate row in the data
+- `geom_text()`: adds labels at specified points; it requires an additional aesthetic, `label`
+- `geom_tile()`: makes an **image plot**, where tiles are a regular tessellation of the plane
+
+```{r ex5_1, fig.width=7, fig.height=6, message=F, warning=F}
+library(ggplot2)
+library(gridExtra)
+df = data.frame(x=c(3, 1, 5), y=c(2, 4, 6),
+                label=c("a", "b", "c"))
+p = ggplot(df, aes(x, y, label=label)) + xlab(NULL) + ylab(NULL)
+grid.arrange(p + geom_point() + labs(title="geom_point"),
+             p + geom_bar(stat="identity") + labs(title="geom_bar"),
+             p + geom_line() + labs(title="geom_line"),
+             p + geom_area() + labs(title="geom_area"),
+             p + geom_path() + labs(title="geom_path"),
+             p + geom_text() + labs(title="geom_text"),
+             p + geom_tile() + labs(title="geom_tile"),
+             p + geom_polygon() + labs(title="geom_polygon"),
+             ncol=4)
+```
+
+# Displaying distributions
+
+Several `geom`s are available to display distributions, depending on how many dimensions the distribution has, whether it's continuous or discrete, or whether you want conditional or joint distributions.
+
+For 1D continuous distributions, the **histogram** is the most important `geom`. It is always important to experiment with the `binwidth` and/or `breaks` options to obtain a suitable view onto the data that reveals the relevant characteristics. Never rely on the default values to give you insight into your data. 
+
+```{r ex5_2, fig.width=7, fig.height=3, message=F, warning=F}
+p = ggplot(diamonds, aes(depth)) + xlim(55, 70)
+grid.arrange(p + geom_histogram(aes(y=..density..)),
+             p + geom_histogram(aes(y=..density..), binwidth=0.1),
+             ncol=2)
+```
+
+To compare between groups: small multiples plots can be used (`facets = . ~ var`); a frequency polygon (`geom="freqpoly"`) can be used; or a conditional density plot may be suitable (`position="fill"`), as illustrated below.
+
+```{r ex5_3, fig.width=5, fig.height=4, message=F, warning=F}
+p = ggplot(diamonds, aes(depth)) + xlim(58, 68)
+p + geom_histogram(aes(y=..density..), binwidth=0.1) + facet_grid(cut ~ .)
+p + geom_histogram(aes(fill=cut), binwidth=0.1, position="fill")
+p + geom_freqpoly(aes(y=..density.., colour=cut), binwidth=0.1)
+```
+
+Both histogram and frequency polygon plots use `stat_bin`, which gives `..count..` (default) and `..density..` output variables. The `..density..` variable, being normalised to the total count, is useful for comparison of distribution shapes.
+
+**Box-and-whisker** plots are used for continuous variables conditionsed by a categorical variable. The example below show boxplots conditioned on categorical and continuous variables.
+
+```{r ex5_4, fig.width=7, fig.height=3, message=F, warning=F}
+# We need plyr for round_any() below. round_any() rounds the first argument 
+# number to a multiple of the second argument; floor means that the first
+# argument rounds down, rather than up (the default).
+library(plyr)
+qplot(cut, depth, data=diamonds, geom="boxplot")
+qplot(carat, depth, data=diamonds, geom="boxplot", 
+      group=round_any(carat, 0.1, floor), xlim=c(0, 3))
+```
