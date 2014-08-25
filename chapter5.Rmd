@@ -74,7 +74,7 @@ Both histogram and frequency polygon plots use `stat_bin`, which gives `..count.
 
 **Box-and-whisker** plots are used for continuous variables conditionsed by a categorical variable. The example below show boxplots conditioned on categorical and continuous variables.
 
-```{r ex5_4, fig.width=7, fig.height=3, message=F, warning=F}
+```{r ex5_4, fig.width=5, fig.height=3, message=F, warning=F}
 # We need plyr for round_any() below. round_any() rounds the first argument 
 # number to a multiple of the second argument; floor means that the first
 # argument rounds down, rather than up (the default).
@@ -82,4 +82,126 @@ library(plyr)
 qplot(cut, depth, data=diamonds, geom="boxplot")
 qplot(carat, depth, data=diamonds, geom="boxplot", 
       group=round_any(carat, 0.1, floor), xlim=c(0, 3))
+```
+
+**Jitter** plots are a crude way of assessing discrete distributions by adding random noise to reduce overplotting.
+
+```{r ex5_5, fig.width=5, fig.height=3, message=F, warning=F}
+qplot(class, cty, data=mpg, geom="jitter")
+qplot(class, drv, data=mpg, geom="jitter")
+```
+
+**Density** plots are a smoothed variant of frequency polygons, where the curve is smoothed by a kernel. These are appropriate when the underlying density is smooth, continuous, and unbounded. The `adjust` parameter varies the smoothness of the density.
+
+```{r ex5_6, fig.width=5, fig.height=3, message=F, warning=F}
+qplot(depth, data=diamonds, geom="density", xlim=c(54, 70))
+qplot(depth, data=diamonds, geom="density", xlim=c(54, 70), fill=cut, alpha=I(0.2))
+```
+
+# Dealing with overplotting
+
+When large datasets are used, scatterplots can be difficult to interpret due to overplotting. If there are too many points, relationships can be obscured as it is difficult to see the density of data in any particular area and, in the worst case, all that can be seen is the extent of the data.
+
+To reduce the effect of small amounts of overplotting, smaller and hollow glyphs may be used:
+
+```{r ex5_7, fig.width=7, fig.height=3, message=F, warning=F}
+# Two 2000 point samples
+df = data.frame(x=rnorm(2000), y=rnorm(2000))
+norm = ggplot(df, aes(x, y))
+grid.arrange(norm + geom_point() + labs(title="overplot"),
+             norm + geom_point(shape=1) + labs(title="hollow"),
+             norm + geom_point(shape=".") + labs(title="small"),
+             ncol = 3)
+```
+
+If the dataset is larger, it may be worth reducing glyph transparency with `alpha`. Specifying `alpha` as a ratio, e.g. as `1/n`, means that `n` points need to be overplotted to give a solid colour; the smallest allowable value is 1/256. 
+
+```{r ex5_8, fig.width=7, fig.height=3, message=F, warning=F}
+# Same examples as before, but we need the scales library to use alpha()
+library(scales)
+grid.arrange(norm + geom_point(colour=alpha("black", 1/3)) + labs(title="1/3"),
+             norm + geom_point(colour=alpha("black", 1/5)) + labs(title="1/5"),
+             norm + geom_point(colour=alpha("black", 1/10)) + labs(title="1/10"),
+             ncol = 3)
+```
+
+For discrete data, jittering may be useful, especially in conjunction with transparency. The default jitter is 40% of the data resolution, to leave a small gap between adjacent regions. 
+
+```{r ex5_9, fig.width=7, fig.height=6, message=F, warning=F}
+td = ggplot(diamonds, aes(table, depth)) + xlim(50, 70) + ylim(50, 70)
+jit = position_jitter(width=0.5)   # Set jitter to 0.5 (absolute value)
+grid.arrange(td + geom_point() + labs(title="geom_point"),
+             td + geom_jitter() + labs(title="geom_jitter"),
+             td + geom_jitter(position=jit) + labs(title="geom_jitter"),
+             td + geom_jitter(position=jit, colour=alpha("black", 1/10)) + labs(title="geom_jitter, 1/10"),
+             td + geom_jitter(position=jit, colour=alpha("black", 1/50)) + labs(title="geom_jitter, 1/50"),
+             td + geom_jitter(position=jit, colour=alpha("black", 1/200)) + labs(title="geom_jitter, 1/200"),
+             ncol = 3)
+```
+
+The main problem of overplotting is that it is difficult to see the density of data in any particular area, so we might treat the issue as a 2D density estimation, instead. The brute force approach is to bin the data in 2D, and visualise the count as the 2D generalisation of a histogram. The usual way to do this is to use squares but this can lead to visual artefacts, and in these instances a hexagonal binning strategy with `geom_hexagon` or `stat_binhex` can be useful, for which the `hexbin` library is required. As ever with binned counts, it is wise never to accept the defaults without experimentation to determine which views give the most informative output.
+
+```{r ex5_10, fig.width=7, fig.height=6, message=F, warning=F}
+# To use stat_binhex() we need the hexbin library
+library(hexbin)
+d = ggplot(diamonds, aes(carat, price)) + xlim(1, 3) + theme(legend.position="none")
+grid.arrange(d + stat_bin2d() + labs(title="stat_bin2d"),
+             d + stat_bin2d(bins=10) + labs(title="bins=10"),
+             d + stat_bin2d(binwidth=c(0.02, 200)) + labs(title="c(0.02, 200)"),
+             d + stat_binhex() + labs(title="stat_binhex"),
+             d + stat_binhex(bins=10) + labs(title="bins=10"),
+             d + stat_binhex(binwidth=c(0.02, 200)) + labs(title="binwidth=c(0.02, 200)"),
+             ncol = 3)
+```
+
+Another approach here is to estimate the underlying 2D density using `stat_density2d`. Once this is done, then the density contours can be overlaid, the density shown as coloured tiles, or points with size proportinal to density, and so on.
+
+```{r ex5_11, fig.width=7, fig.height=6, message=F, warning=F}
+d = ggplot(diamonds, aes(carat, price)) + xlim(1, 3) + theme(legend.position="none")
+grid.arrange(d + geom_point() + geom_density2d() + labs(title="contours"),
+             d + stat_density2d(geom="point", aes(size=..density..), contour=F) + labs(title="size proportional"),
+             d + stat_density2d(geom="tile", aes(fill=..density..), contour=F) + labs(title="image"),
+             last_plot() + scale_fill_gradient(limits=c(1e-5, 8e-4)) + labs(title="contour restriction"),
+             ncol = 2)
+```
+
+# Drawing maps
+
+The `maps` package provides some maps, and tools for map display. These can be incorporated into `ggplot2` output so you can, for example, add reference outlines to plots of spatial data, or to construct a chloropleth map. Map borders are added with the `borders()` function; the first two arguments indicate the `map` and the `region` within the map to be displayed. The rest of the arguments control the appearance of borders with `colour`, `size` and `fill`.
+
+```{r ex5_12, fig.width=7, fig.height=3, message=F, warning=F}
+library(maps)
+data(us.cities)
+big_cities = subset(us.cities, pop>5e5)
+tx_cities = subset(us.cities, country.etc=="TX")
+grid.arrange(qplot(long, lat, data=big_cities) + borders("state", size=0.5) + labs(title="large US cities"),
+             ggplot(tx_cities, aes(long, lat)) + borders("county", "texas", colour="grey70") + geom_point(colour=alpha("black", 0.5)) + labs(title="Texas cities"),
+             ncol=2)
+```
+
+It is more difficult to render chloropleth maps, in part because data identifiers need to match map data identifiers. The example below uses `map_data()` to convert a map into a data frame, which is then `merge()`d with data to produce a chloropleth map.
+
+```{r ex5_13, fig.width=7, fig.height=6, message=F, warning=F}
+states = map_data("state")
+arrests = USArrests
+names(arrests) = tolower(names(arrests))
+arrests$region = tolower(rownames(USArrests))
+choro = merge(states, arrests, by="region")
+# Reorder rows so that the original polygon ordering is 
+# retained.
+choro = choro[order(choro$order),]
+grid.arrange(qplot(long, lat, data=choro, group=group, fill=assault, geom="polygon") + labs(title="assault"),
+             qplot(long, lat, data=choro, group=group, fill=assault/murder, geom="polygon") + labs(title="assault/murder"),
+             ncol=1)
+```
+
+The `map_data()` function is useful for processing map data.
+
+```{r ex5_14, fig.width=7, fig.height=4, message=F, warning=F}
+ia = map_data("county", "iowa")
+mid_range = function(x) mean(range(x, na.rm=TRUE))  # function to find the midpoint of a range of values
+# ddply() breaks a dataframe up into subsets on the basis of some value,
+# applys a function to each subset, and joins the results back into a dataframe
+centres = ddply(ia, .(subregion), colwise(mid_range, .(lat, long)))  # Centre point of each county
+ggplot(ia, aes(long, lat)) + geom_polygon(aes(group=group), fill=NA, colour="grey60") + geom_text(aes(label=subregion), data=centres, size=2, angle=45)
 ```
